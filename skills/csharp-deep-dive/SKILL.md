@@ -16,10 +16,22 @@ description: >
 
 # C# Deep Dive
 
-Two layers of investigation. Always start with Layer 1. Escalate to Layer 2 only when
-the user's code alone cannot explain the behavior.
+Choose the right investigation strategy based on the problem type. Use one or both as needed.
 
-## Layer 1 — LSP Code Intelligence (always do this first)
+## Decision guide
+
+| Problem signal | Strategy | Why |
+|----------------|----------|-----|
+| Bug in the user's own code: wrong logic, missing null check, incorrect wiring, DI mismatch, XAML binding error | **LSP Code Intelligence** | The answer is in the user's codebase — trace it with precision |
+| Repeated fix attempts fail on the same symptom | **LSP Code Intelligence** first, then add **Reference Source** if LSP reveals the problem is in framework behavior | Confirm you're not missing something in user code before blaming the framework |
+| User asks "how does X work under the hood" / "what does framework method Y actually do" | **.NET Reference Source** | The answer is in the framework, not the user's code |
+| Unexpected framework behavior: surprising exception, silent data loss, odd query translation, layout glitch | **.NET Reference Source** | Reading the actual source beats guessing at framework internals |
+| Designing architecture that depends on framework guarantees (thread safety, disposal, pipeline ordering) | **.NET Reference Source** | Verify assumptions against the real implementation |
+| User asks to validate feasibility: "this approach works?", "can I do X?", "is this usage correct?" | **.NET Reference Source** | Don't guess — read the framework source to confirm whether the API supports the intended usage, and surface any limits or edge cases |
+
+---
+
+## LSP Code Intelligence
 
 Use the LSP tool to build a precise understanding of the user's code before making changes.
 This replaces guesswork with facts: actual types, actual call sites, actual implementations.
@@ -58,10 +70,11 @@ to symptom, backed by LSP evidence. If you can't, keep tracing.
   `goToDefinition` on the ViewModel, `documentSymbol` to verify property names.
 - **Wrong overload resolution**: `hover` reveals the compiler picked a different overload.
 
-## Layer 2 — .NET Reference Source (escalate when needed)
+---
 
-When the problem is not in the user's code but in how .NET itself behaves, reading the
-actual framework source code is the fastest path to a definitive answer.
+## .NET Reference Source
+
+Read the actual framework source code to understand how .NET behaves internally.
 
 ### Step 1: Detect the user's target framework
 
@@ -140,12 +153,36 @@ After cloning, use `Grep` and `Glob` to locate the relevant code:
 - **Focus narrowly**: Don't try to understand the whole framework.
   Zero in on the exact method or property that relates to the user's problem.
 
-### Example: debugging an EF Core query issue in a .NET 8 project
+---
 
-1. **Layer 1**: LSP traces the user's LINQ query. The query itself looks correct.
-2. Suspect EF Core's query translation is generating unexpected SQL.
-3. Detect `<TargetFramework>net8.0</TargetFramework>`.
-4. Clone: `git clone --depth 1 --branch release/8.0 https://github.com/dotnet/efcore.git <path>`
-5. `Grep` for the LINQ method causing trouble (e.g., `GroupBy` translation).
-6. Read the query pipeline source → find how EF translates that LINQ pattern to SQL.
-7. Explain the root cause. Propose a workaround grounded in actual framework behavior.
+## Examples
+
+### User's own code bug — LSP only
+
+User reports a NullReferenceException in a service method.
+
+1. `goToDefinition` on the method → read the implementation.
+2. `hover` on the variable that's null → confirm its type.
+3. `incomingCalls` → find all callers, check which one passes null.
+4. `findReferences` on the parameter → verify no other code depends on it being nullable.
+5. Fix with confidence.
+
+### Framework behavior question — Reference Source only
+
+User asks: "Does `ConcurrentDictionary.GetOrAdd` guarantee the factory runs only once?"
+
+1. Detect target framework from `.csproj` → `net8.0`.
+2. Clone `dotnet/runtime` at `release/8.0`.
+3. `Grep` for `GetOrAdd` in the `ConcurrentDictionary` source.
+4. Read the implementation → answer definitively from the source.
+
+### Repeated failure — LSP then Reference Source
+
+User's EF Core query keeps returning wrong results despite correct-looking LINQ.
+
+1. LSP: trace the query expression, verify types, confirm the LINQ is correct in user code.
+2. LSP can't explain the behavior → suspect EF Core's query translation.
+3. Detect `net8.0`, clone `dotnet/efcore` at `release/8.0`.
+4. `Grep` for the relevant LINQ translation (e.g., `GroupBy`).
+5. Read the query pipeline source → find how EF translates that pattern to SQL.
+6. Explain root cause. Propose a workaround grounded in actual framework behavior.
