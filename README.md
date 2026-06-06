@@ -4,12 +4,9 @@ My custom Claude Code skills and commands.
 
 ## Contents
 
-### Commands
-
-- **git-push** (`commands/git-push.md`) — Stage, commit with conventional commit prefix, and push to remote. Supports specifying commit message language.
-
 ### Skills
 
+- **git-push** (`skills/git-push/SKILL.md`) — Stage, commit with conventional commit prefix, and push to remote. Supports specifying commit message language.
 - **csharp-deep-dive** (`skills/csharp-deep-dive/SKILL.md`) — Deep C# code intelligence using LSP to trace call chains, type relationships, and symbol definitions. Escalates to .NET reference source when needed.
 
 ## How to Use
@@ -30,10 +27,10 @@ Copy the files to the corresponding paths to enable them:
 For example, to install everything from this repo at the user level:
 
 ```bash
-# Commands
-cp commands/git-push.md ~/.claude/commands/git-push.md
-
 # Skills
+mkdir -p ~/.claude/skills/git-push
+cp skills/git-push/SKILL.md ~/.claude/skills/git-push/SKILL.md
+
 mkdir -p ~/.claude/skills/csharp-deep-dive
 cp skills/csharp-deep-dive/SKILL.md ~/.claude/skills/csharp-deep-dive/SKILL.md
 ```
